@@ -33,3 +33,23 @@ export interface StreamingResponse {
   content: string;
   done: boolean;
 }
+
+
+export interface BatchAnalysis {
+  id: number;
+  title: string;
+  prompt: string;
+  created_at: string;
+  results_count: number;
+}
+
+export interface BatchAnalysisResult {
+  id: number;
+  file_url: string;
+  response: string;
+  created_at: string;
+}
+
+export interface BatchAnalysisDetails extends BatchAnalysis {
+  results: BatchAnalysisResult[];
+}
