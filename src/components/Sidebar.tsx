@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, MessageSquare, Trash2, LogOut, User, Sparkles, Settings, Crown } from 'lucide-react';
-import { Session } from '../types/api';
-import { sessionApi } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+"use client"
+
+import type React from "react"
+import { useState } from "react"
+import { Plus, MessageSquare, Trash2, LogOut, User, Sparkles, Settings, Crown } from "lucide-react"
+import type { Session } from "../types/api"
+import { sessionApi } from "../services/api"
+import { useAuth } from "../context/AuthContext"
 
 interface SidebarProps {
-  sessions: Session[];
-  currentSessionId: number | null;
-  onSessionSelect: (sessionId: number) => void;
-  onNewSession: () => void;
-  onSessionsUpdate: () => void;
+  sessions: Session[]
+  currentSessionId: number | null
+  onSessionSelect: (sessionId: number) => void
+  onNewSession: () => void
+  onSessionsUpdate: () => void
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -19,40 +22,40 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewSession,
   onSessionsUpdate,
 }) => {
-  const { user, logout, token } = useAuth();
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const { user, logout, token } = useAuth()
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
 
   const handleDeleteSession = async (sessionId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!token) return;
-    
-    setDeletingSessionId(sessionId);
+    e.stopPropagation()
+    if (!token) return
+
+    setDeletingSessionId(sessionId)
     try {
-      await sessionApi.deleteSession(sessionId, token);
-      onSessionsUpdate();
+      await sessionApi.deleteSession(sessionId, token)
+      onSessionsUpdate()
       if (currentSessionId === sessionId) {
         // If we deleted the current session, create a new one
-        onNewSession();
+        onNewSession()
       }
     } catch (error) {
-      console.error('Error deleting session:', error);
+      console.error("Error deleting session:", error)
     } finally {
-      setDeletingSessionId(null);
+      setDeletingSessionId(null)
     }
-  };
+  }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    
+    const date = new Date(dateString)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
     if (messageDate.getTime() === today.getTime()) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" })
     }
-  };
+  }
 
   return (
     <div className="h-full bg-gray-900/90 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
@@ -67,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-gray-500 text-sm">AI Assistant</p>
           </div>
         </div>
-        
+
         <button
           onClick={onNewSession}
           className="w-full flex items-center justify-center py-3 px-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/25 transform hover:scale-105 transition-all duration-300"
@@ -86,26 +89,28 @@ const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => onSessionSelect(session.id)}
               className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-300 ${
                 currentSessionId === session.id
-                  ? 'bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/40 shadow-lg'
-                  : 'hover:bg-gray-800/50 border border-transparent hover:border-gray-600/30'
+                  ? "bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/40 shadow-lg"
+                  : "hover:bg-gray-800/50 border border-transparent hover:border-gray-600/30"
               }`}
             >
               <div className="flex items-center space-x-3 flex-1 min-w-0">
-                <MessageSquare className={`w-4 h-4 flex-shrink-0 ${
-                  currentSessionId === session.id ? 'text-purple-400' : 'text-gray-500'
-                }`} />
+                <MessageSquare
+                  className={`w-4 h-4 flex-shrink-0 ${
+                    currentSessionId === session.id ? "text-purple-400" : "text-gray-500"
+                  }`}
+                />
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${
-                    currentSessionId === session.id ? 'text-white' : 'text-gray-300'
-                  }`}>
+                  <p
+                    className={`text-sm font-medium truncate ${
+                      currentSessionId === session.id ? "text-white" : "text-gray-300"
+                    }`}
+                  >
                     {session.title}
                   </p>
-                  <p className="text-xs text-gray-600 truncate">
-                    {formatDate(session.created_at)}
-                  </p>
+                  <p className="text-xs text-gray-600 truncate">{formatDate(session.created_at)}</p>
                 </div>
               </div>
-              
+
               <button
                 onClick={(e) => handleDeleteSession(session.id, e)}
                 disabled={deletingSessionId === session.id}
@@ -141,10 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
           <div className="flex items-center space-x-1">
-            <button
-              className="p-2 text-gray-500 hover:text-white transition-colors duration-200"
-              title="Settings"
-            >
+            <button className="p-2 text-gray-500 hover:text-white transition-colors duration-200" title="Settings">
               <Settings className="w-4 h-4" />
             </button>
             <button
@@ -158,7 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Sidebar;
+export default Sidebar

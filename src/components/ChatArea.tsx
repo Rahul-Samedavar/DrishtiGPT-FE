@@ -1,120 +1,187 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  Send,
-  Paperclip,
-  X,
-  Image,
-  FileText,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-import { Message } from "../types/api";
-import MessageBubble from "./MessageBubble";
-import { chatApi } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+"use client"
+
+import type React from "react"
+import { useState, useRef, useEffect } from "react"
+import { Send, Paperclip, X, ImageIcon, FileText, Sparkles, Zap, Mic, MicOff, Calendar } from "lucide-react"
+import type { Message } from "../types/api"
+import MessageBubble from "./MessageBubble"
+import { chatApi } from "../services/api"
+import { useAuth } from "../context/AuthContext"
+import type { SpeechRecognition } from "web-speech-api"
 
 interface ChatAreaProps {
-  sessionId: number | null;
-  messages: Message[];
-  onMessagesUpdate: () => void;
+  sessionId: number | null
+  sessionTitle?: string // Added session title prop
+  sessionCreatedAt?: string // Added session created date prop
+  messages: Message[]
+  onMessagesUpdate: () => void
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
   sessionId,
+  sessionTitle, // Added session title prop
+  sessionCreatedAt, // Added session created date prop
   messages,
   onMessagesUpdate,
 }) => {
-  const [input, setInput] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingMessage, setStreamingMessage] = useState("");
-  const [isDragOver, setIsDragOver] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { token } = useAuth();
+  const [input, setInput] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingMessage, setStreamingMessage] = useState("")
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { token } = useAuth()
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingMessage]);
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognitionInstance = new SpeechRecognition()
+      recognitionInstance.continuous = true
+      recognitionInstance.interimResults = true
+      recognitionInstance.lang = "en-US"
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || !sessionId || !token || isStreaming) return;
-
-    const messageText = input.trim();
-
-    onMessagesUpdate();
-    setInput("");
-    setIsStreaming(true);
-    setStreamingMessage("");
-
-    try {
-      await chatApi.sendMessage(
-        sessionId,
-        messageText,
-        files,
-        token,
-        (chunk) => {
-          if (chunk.content) {
-            setStreamingMessage((prev) => prev + chunk.content);
-          }
-          if (chunk.done) {
-            setIsStreaming(false);
-            setStreamingMessage("");
-            onMessagesUpdate();
+      recognitionInstance.onresult = (event) => {
+        let finalTranscript = ""
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript
           }
         }
-      );
-      setFiles([]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      setIsStreaming(false);
-      setStreamingMessage("");
+        if (finalTranscript) {
+          setInput((prev) => prev + finalTranscript)
+        }
+      }
+
+      recognitionInstance.onerror = (event) => {
+        console.error("Speech recognition error:", event.error)
+        setIsRecording(false)
+      }
+
+      setRecognition(recognitionInstance)
     }
-  };
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isRecording) {
+        stopRecording()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [isRecording])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamingMessage])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  const startRecording = () => {
+    if (recognition) {
+      setIsRecording(true)
+      recognition.start()
+    }
+  }
+
+  const stopRecording = () => {
+    if (recognition && isRecording) {
+      recognition.stop()
+      setIsRecording(false)
+      // Auto-send the message after recording
+      if (input.trim()) {
+        handleSend()
+      }
+    }
+  }
+
+  const handleSend = async () => {
+    if (!input.trim() || !sessionId || !token || isStreaming) return
+
+    const messageText = input.trim()
+
+    onMessagesUpdate()
+    setInput("")
+    setIsStreaming(true)
+    setStreamingMessage("")
+
+    try {
+      await chatApi.sendMessage(sessionId, messageText, files, token, (chunk) => {
+        if (chunk.content) {
+          setStreamingMessage((prev) => prev + chunk.content)
+        }
+        if (chunk.done) {
+          setIsStreaming(false)
+          setStreamingMessage("")
+          onMessagesUpdate()
+        }
+      })
+      setFiles([])
+    } catch (error) {
+      console.error("Error sending message:", error)
+      setIsStreaming(false)
+      setStreamingMessage("")
+    }
+  }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+      e.preventDefault()
+      handleSend()
     }
-  };
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []);
-    setFiles((prev) => [...prev, ...selectedFiles]);
-  };
+    const selectedFiles = Array.from(e.target.files || [])
+    setFiles((prev) => [...prev, ...selectedFiles])
+  }
 
   const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    setFiles((prev) => [...prev, ...droppedFiles]);
-  };
+    e.preventDefault()
+    setIsDragOver(false)
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    setFiles((prev) => [...prev, ...droppedFiles])
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
+    e.preventDefault()
+    setIsDragOver(true)
+  }
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
+    e.preventDefault()
+    setIsDragOver(false)
+  }
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/")) {
-      return <Image className="w-4 h-4" />;
+      return <ImageIcon className="w-4 h-4" />
     }
-    return <FileText className="w-4 h-4" />;
-  };
+    return <FileText className="w-4 h-4" />
+  }
+
+  const formatHeaderDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString([], {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
 
   if (!sessionId) {
     return (
@@ -132,9 +199,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           <h3 className="text-2xl font-bold text-white mb-3 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             Welcome to DrishtiGPT
           </h3>
-          <p className="text-gray-500 text-lg mb-6">
-            Start a new conversation to begin chatting with AI
-          </p>
+          <p className="text-gray-500 text-lg mb-6">Start a new conversation to begin chatting with AI</p>
           <div className="flex items-center justify-center space-x-6 text-gray-600">
             <div className="flex items-center">
               <Zap className="w-4 h-4 mr-2 text-yellow-400" />
@@ -147,7 +212,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -163,28 +228,38 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
               <Paperclip className="w-8 h-8 text-white" />
             </div>
-            <p className="text-white text-xl font-bold">
-              Drop files here to upload
-            </p>
-            <p className="text-gray-300 text-sm mt-2">
-              Images and documents supported
-            </p>
+            <p className="text-white text-xl font-bold">Drop files here to upload</p>
+            <p className="text-gray-300 text-sm mt-2">Images and documents supported</p>
+          </div>
+        </div>
+      )}
+
+      {sessionTitle && (
+        <div className="p-6 border-b border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">{sessionTitle}</h2>
+              {sessionCreatedAt && (
+                <div className="flex items-center text-sm text-gray-400">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <span>Created {formatHeaderDate(sessionCreatedAt)}</span>
+                </div>
+              )}
+            </div>
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
           </div>
         </div>
       )}
 
       {/* Messages */}
-      {/* ---- MODIFICATION START ---- */}
       <div className="flex-1 overflow-y-auto p-6 flex flex-col scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
         {/* This spacer div pushes the content below it to the bottom */}
         <div className="mt-auto" />
         <div className="space-y-6">
           {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isLast={index === messages.length - 1}
-            />
+            <MessageBubble key={message.id} message={message} isLast={index === messages.length - 1} />
           ))}
 
           {isStreaming && streamingMessage && (
@@ -205,7 +280,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           <div ref={messagesEndRef} />
         </div>
       </div>
-      {/* ---- MODIFICATION END ---- */}
 
       {/* Input Area */}
       <div className="p-6 border-t border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
@@ -218,9 +292,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   className="flex items-center space-x-2 bg-gray-800/60 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-600/50"
                 >
                   {getFileIcon(file)}
-                  <span className="text-sm text-white truncate max-w-32">
-                    {file.name}
-                  </span>
+                  <span className="text-sm text-white truncate max-w-32">{file.name}</span>
                   <button
                     onClick={() => removeFile(index)}
                     className="text-gray-500 hover:text-red-400 transition-colors"
@@ -247,13 +319,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               />
 
               <div className="flex items-center justify-between mt-3">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-500 hover:text-purple-400 transition-colors rounded-lg hover:bg-gray-700/50"
-                  title="Attach files"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-gray-500 hover:text-purple-400 transition-colors rounded-lg hover:bg-gray-700/50"
+                    title="Attach files"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    onMouseDown={startRecording}
+                    onMouseUp={stopRecording}
+                    onMouseLeave={stopRecording}
+                    className={`p-2 transition-colors rounded-lg hover:bg-gray-700/50 ${
+                      isRecording ? "text-red-400 bg-red-400/20" : "text-gray-500 hover:text-blue-400"
+                    }`}
+                    title={isRecording ? "Release to send (ESC to cancel)" : "Hold to record"}
+                  >
+                    {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+                </div>
 
                 <button
                   onClick={handleSend}
@@ -271,6 +357,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
         </div>
+
+        {isRecording && (
+          <div className="mt-3 flex items-center justify-center">
+            <div className="bg-red-500/20 border border-red-500/50 rounded-full px-4 py-2 flex items-center space-x-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-red-400 text-sm font-medium">Recording... Release to send, ESC to cancel</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <input
@@ -282,7 +377,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         accept="image/*,*"
       />
     </div>
-  );
-};
+  )
+}
 
-export default ChatArea;
+export default ChatArea

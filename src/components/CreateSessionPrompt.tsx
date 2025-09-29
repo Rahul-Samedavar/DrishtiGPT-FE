@@ -1,24 +1,27 @@
-import React, { useState } from 'react';
+"use client"
+
+import type React from "react"
+import { useState } from "react"
 
 interface CreateSessionPromptProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (name: string) => void;
+  isOpen: boolean
+  onClose: () => void
+  onCreate: (name: string) => void
 }
 
 const CreateSessionPrompt: React.FC<CreateSessionPromptProps> = ({ isOpen, onClose, onCreate }) => {
-  const [sessionName, setSessionName] = useState('');
+  const [sessionName, setSessionName] = useState("")
 
   const handleCreate = () => {
     if (sessionName.trim()) {
-      onCreate(sessionName.trim());
-      setSessionName('');
-      onClose();
+      onCreate(sessionName.trim())
+      setSessionName("")
+      onClose()
     }
-  };
+  }
 
   if (!isOpen) {
-    return null;
+    return null
   }
 
   return (
@@ -33,22 +36,16 @@ const CreateSessionPrompt: React.FC<CreateSessionPromptProps> = ({ isOpen, onClo
           className="w-full bg-gray-700 text-white rounded-md px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-600"
         />
         <div className="flex justify-end space-x-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500"
-          >
+          <button onClick={onClose} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500">
             Cancel
           </button>
-          <button
-            onClick={handleCreate}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-500"
-          >
+          <button onClick={handleCreate} className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-500">
             Create
           </button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CreateSessionPrompt;
+export default CreateSessionPrompt
